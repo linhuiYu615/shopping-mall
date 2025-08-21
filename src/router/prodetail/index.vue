@@ -82,6 +82,7 @@
         <span>首页</span>
       </div>
       <div class="icon-cart">
+        <span v-if="cartTotal > 0" class="num">{{ cartTotal }}</span>
         <van-icon name="shopping-cart-o" />
         <span>购物车</span>
       </div>
@@ -90,35 +91,40 @@
     </div>
 
     <!-- 购物车弹窗 -->
-    <van-action-sheet v-model="show" :title="title === 'cart' ? '加入购物车' : '立刻购买'">
-  <div class="product">
-    <div class="product-title">
-      <div class="left">
-        <img :src="detaildata.goods_image" alt="">
-      </div>
-      <div class="right">
-        <div class="price">
-          <span>¥</span>
-          <span class="nowprice">{{detaildata.goods_price_min}}</span>
+    <van-action-sheet
+      v-model="show"
+      :title="title === 'cart' ? '加入购物车' : '立刻购买'"
+    >
+      <div class="product">
+        <div class="product-title">
+          <div class="left">
+            <img :src="detaildata.goods_image" alt="" />
+          </div>
+          <div class="right">
+            <div class="price">
+              <span>¥</span>
+              <span class="nowprice">{{ detaildata.goods_price_min }}</span>
+            </div>
+            <div class="count">
+              <span>库存</span>
+              <span>{{ detaildata.stock_total }}</span>
+            </div>
+          </div>
         </div>
-        <div class="count">
-          <span>库存</span>
-          <span>{{detaildata.stock_total}}</span>
+        <div class="num-box">
+          <span>数量</span>
+          <countBox v-model="count" :stock="detaildata.stock_total"></countBox>
         </div>
+        <div class="showbtn" v-if="detaildata.stock_total > 0">
+          <div class="btn" v-if="title === 'cart'" @click="addcart">
+            加入购物车
+          </div>
+          <div class="btn now" v-else>立刻购买</div>
+        </div>
+        <div v-else class="btn-none">该商品已抢完</div>
       </div>
-    </div>
-    <div class="num-box">
-      <span>数量</span>
-      <countBox v-model="count" :stock="detaildata.stock_total"></countBox>
-    </div>
-    <div class="showbtn" v-if="detaildata.stock_total>0">
-      <div class="btn" v-if="title === 'cart'">加入购物车</div>
-      <div class="btn now" v-else>立刻购买</div>
-    </div>
-    <div v-else class="btn-none">该商品已抢完</div>
+    </van-action-sheet>
   </div>
-</van-action-sheet>
-</div>
 </template>
 
 <script>
@@ -127,6 +133,8 @@ import { getdetail, getprocomment } from '@/api/prolist'
 import defultimg from '@/assets/default-avatar.png'
 // import Cart from '../layout/cart.vue'
 import countBox from '@/components/countBox.vue'
+import { Dialog, Toast } from 'vant'
+import { getcart } from '@/api/cart'
 
 export default {
   name: 'ProDetail',
@@ -143,7 +151,8 @@ export default {
       defultimg,
       show: false,
       title: 'cart',
-      count: 1
+      count: 1,
+      cartTotal: 1
     }
   },
   computed: {
@@ -182,6 +191,42 @@ export default {
     buyfn () {
       this.title = 'buynow'
       this.show = true
+    },
+    async addcart () {
+      // console.log('addcart clicked')
+      // 有没有token 就弹窗
+      if (!this.$store.getters.token) {
+        // ActionSheet和dialog共用一个层级 两个互斥了 所以我虽然没写show关闭 但是我写了一遍 让他们的层级产生了变化 后者压上来了
+        // this.show = false
+        Dialog.confirm({
+          title: '提示',
+          message: '接下来要登录才能继续',
+          showConfirmButton: '去登录',
+          showCancelButton: '再逛逛'
+        })
+          .then(() => {
+            // login那边需要要回退这个页面 要把这个页面的参数传过去 replace和push的区别是replace不保留路径的
+            this.$router.replace({
+              path: '/login',
+              // query查询
+              query: {
+                backUrl: this.$router.fullPath
+              }
+            })
+          })
+          .catch(() => {
+            // on cancel
+          })
+      }
+      const { data: { cartTotal } } = await getcart(
+        this.goodsId,
+        this.count,
+        this.detaildata.skuList[0].goods_sku_id
+      )
+      this.cartTotal = cartTotal
+      this.show = false
+      Toast('加入购物车成功')
+      console.log(cartTotal)
     }
   }
 }
@@ -366,7 +411,8 @@ export default {
     align-items: center;
   }
 
-  .btn, .btn-none {
+  .btn,
+  .btn-none {
     height: 40px;
     line-height: 40px;
     margin: 20px;
@@ -380,6 +426,23 @@ export default {
   }
   .btn-none {
     background-color: #cccccc;
+  }
+}
+
+.footer .icon-cart {
+  position: relative;
+  padding: 0 6px;
+  .num {
+    z-index: 999;
+    position: absolute;
+    top: -2px;
+    right: 0;
+    min-width: 16px;
+    padding: 0 4px;
+    color: #fff;
+    text-align: center;
+    background-color: #ee0a24;
+    border-radius: 50%;
   }
 }
 </style>

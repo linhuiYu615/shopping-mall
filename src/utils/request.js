@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { Toast } from 'vant'
+// import { config } from 'vue/types/umd'
+import store from '@/store'
 // https://apifox.com/apidoc/shared-12ab6b18-adc2-444c-ad11-0e60f5693f66/doc-2221080
 // 创建axios实例 对创建出来的实例进行自定义配置 不会污染原始axios实例
 const instance = axios.create({
@@ -18,6 +20,16 @@ instance.interceptors.request.use(
       forbidClick: true,
       loadingType: 'spinner'
     })
+
+    // 只要有token就在请求时携带 ，便于请求需要授权的接口
+    // 组件内部用 this.$store.getters.token
+    const token = store.getters.token
+    if (token) {
+      // config是新实例  Access-Token有特殊字符 .a.b = ['a.b']
+      config.headers['Access-Token'] = token
+    }
+    config.headers.platform = 'H5'
+
     // 在发送请求之前做些什么
     return config
   },
@@ -38,10 +50,11 @@ instance.interceptors.response.use(
     // console.log(res)
     // 提醒用户输入的不对
     if (res.status !== 200) {
-      Toast('图形验证码输入错误')
-      // 用promise.reject方法进行手动拦截
-      return Promise.reject(new Error('图形验证码输入错误'))
+      Toast(res.message || '请求失败')
+      // 用Promise.reject手动拦截
+      return Promise.reject(new Error(res.message || '请求失败'))
     }
+
     return res
   },
   function (error) {

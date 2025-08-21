@@ -135,7 +135,9 @@ export default {
       const res = await logincome(this.mobile, this.msgcode)
       this.$store.commit('user/saveUser', res.data)
       Toast('登录成功')
-      this.$router.push('/home')
+      // 登录后不一定去主页 也可能是登录后去付钱 做判断 如果说上一个页面是产品那边跳过来的 登录完回去
+      const url = this.$route.query.backUrl || '/home'
+      this.$router.replace(url)
     }
   },
   // 页面离开需要销毁定时器 可以搞一个log去看是否销毁成功
