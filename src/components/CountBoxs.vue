@@ -1,5 +1,5 @@
 <template>
-  <div class="countBox">
+  <div class="CountBox">
     <button @click="handlesub" class="sub">-</button>
     <input :value="value" @change="handlechange" class="inp" type="text">
     <button @click="handleadd" class="add">+</button>
@@ -8,7 +8,7 @@
 
 <script>
 export default {
-  name: 'countBox',
+  name: 'CountBox',
   props: {
     value: {
       type: Number,
@@ -54,7 +54,7 @@ export default {
 </script>
 
 <style lang="less" scoped>
-.countBox {
+.CountBox {
   width: 110px;
   display: flex;
   .sub, .add {

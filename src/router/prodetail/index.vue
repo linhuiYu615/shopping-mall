@@ -79,12 +79,12 @@
     <div class="footer">
       <div class="icon-home">
         <van-icon name="wap-home-o" />
-        <span>首页</span>
+        <span @click="$router.push('/home')">首页</span>
       </div>
       <div class="icon-cart">
-        <span v-if="cartTotal > 0" class="num">{{ cartTotal }}</span>
+        <span v-if="cartTotal" class="num">{{ cartTotal }}</span>
         <van-icon name="shopping-cart-o" />
-        <span>购物车</span>
+        <span @click="$router.push('/cart')">购物车</span>
       </div>
       <div class="btn-add" @click="addfn">加入购物车</div>
       <div class="btn-buy" @click="buyfn">立刻购买</div>
@@ -113,13 +113,13 @@
         </div>
         <div class="num-box">
           <span>数量</span>
-          <countBox v-model="count" :stock="detaildata.stock_total"></countBox>
+          <CountBox v-model="count" :stock="detaildata.stock_total"></CountBox>
         </div>
         <div class="showbtn" v-if="detaildata.stock_total > 0">
           <div class="btn" v-if="title === 'cart'" @click="addcart">
             加入购物车
           </div>
-          <div class="btn now" v-else>立刻购买</div>
+          <div class="btn now" v-else @click="instantBuy">立刻购买</div>
         </div>
         <div v-else class="btn-none">该商品已抢完</div>
       </div>
@@ -132,14 +132,16 @@ import { getdetail, getprocomment } from '@/api/prolist'
 // 导入图片 默认头像
 import defultimg from '@/assets/default-avatar.png'
 // import Cart from '../layout/cart.vue'
-import countBox from '@/components/countBox.vue'
-import { Dialog, Toast } from 'vant'
+import CountBox from '@/components/CountBoxs.vue'
+import { Toast } from 'vant'
 import { getcart } from '@/api/cart'
+import checklogin from '@/api/mixins/checklogin'
 
 export default {
   name: 'ProDetail',
+  mixins: [checklogin],
   components: {
-    countBox
+    CountBox
   },
   data () {
     return {
@@ -152,12 +154,24 @@ export default {
       show: false,
       title: 'cart',
       count: 1,
-      cartTotal: 1
+      cartTotal: 0
     }
   },
   computed: {
+    // 立即购买带过来的单件商品参数
     goodsId () {
       return this.$route.params.id
+    },
+    goodsSkuId () { return this.$route.query.goodsSkuId || '' },
+    goodsNum  () { return Number(this.$route.query.goodsNum) || 1 },
+    // 购物车结算带过来的 id 串，如 "3,5,8"
+    cartIds () {
+      return this.$route.query.ids || ''
+    },
+
+    // 拆成数组方便后续 filter
+    cartIdArr () {
+      return this.cartIds ? this.cartIds.split(',') : []
     }
   },
   created () {
@@ -193,40 +207,38 @@ export default {
       this.show = true
     },
     async addcart () {
-      // console.log('addcart clicked')
-      // 有没有token 就弹窗
-      if (!this.$store.getters.token) {
-        // ActionSheet和dialog共用一个层级 两个互斥了 所以我虽然没写show关闭 但是我写了一遍 让他们的层级产生了变化 后者压上来了
-        // this.show = false
-        Dialog.confirm({
-          title: '提示',
-          message: '接下来要登录才能继续',
-          showConfirmButton: '去登录',
-          showCancelButton: '再逛逛'
-        })
-          .then(() => {
-            // login那边需要要回退这个页面 要把这个页面的参数传过去 replace和push的区别是replace不保留路径的
-            this.$router.replace({
-              path: '/login',
-              // query查询
-              query: {
-                backUrl: this.$router.fullPath
-              }
-            })
-          })
-          .catch(() => {
-            // on cancel
-          })
-      }
-      const { data: { cartTotal } } = await getcart(
-        this.goodsId,
-        this.count,
-        this.detaildata.skuList[0].goods_sku_id
-      )
+      if (!this.checkLogin()) return
+      const { data: { cartTotal } } = await getcart(this.goodsId, this.count, this.detaildata.skuList[0].goods_sku_id)
       this.cartTotal = cartTotal
       this.show = false
       Toast('加入购物车成功')
-      console.log(cartTotal)
+    },
+    instantBuy () {
+      if (!this.checkLogin()) return
+
+      const skuId = this.detaildata.skuList?.[0]?.goods_sku_id || ''
+      const num = this.count
+
+      // 更新 pay 模块渲染列表
+      this.$store.commit('pay/SET', [{
+        goods_id: this.detaildata.goods_id,
+        goods_sku_id: skuId,
+        goods_image: this.detaildata.goods_image,
+        goods_name: this.detaildata.goods_name,
+        price: this.detaildata.goods_price_min * 1,
+        qty: num
+      }])
+
+      // 带上 buyNow 所需参数跳转
+      this.$router.push({
+        path: '/pay',
+        query: {
+          mode: 'buyNow',
+          goodsId: this.detaildata.goods_id,
+          goodsSkuId: skuId,
+          goodsNum: num
+        }
+      })
     }
   }
 }

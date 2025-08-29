@@ -1,66 +1,75 @@
+/* src/router/index.js */
 import Vue from 'vue'
 import VueRouter from 'vue-router'
-import login from '@/router/login'
-import layout from '@/router/layout'
-import search from '@/router/search'
-import list from './search/list.vue'
-import prodetail from '@/router/prodetail'
-import pay from '@/router/pay'
-import order from '@/router/order'
-import home from './layout/home.vue'
-import category from './layout/category.vue'
-import cart from './layout/cart.vue'
-import user from './layout/user.vue'
 import store from '@/store'
+
+// ======== 页面组件 ========
+import Login from '@/router/login'
+import Layout from '@/router/layout'
+import Search from '@/router/search'
+import List from '@/router/search/list.vue'
+import ProDetail from '@/router/prodetail'
+import Pay from '@/router/pay'
+import Order from '@/router/order'
+
+// 二级 tab
+import Home from '@/router/layout/home.vue'
+import Category from '@/router/layout/category.vue'
+import Cart from '@/router/layout/cart.vue'
+import User from '@/router/layout/user.vue'
+
 Vue.use(VueRouter)
 
+/* 统一给 push/replace 打补丁 —— 避免重复导航报错 */
+const originPush = VueRouter.prototype.push
+VueRouter.prototype.push = function (location, onResolve, onReject) {
+  if (onResolve || onReject) return originPush.call(this, location, onResolve, onReject)
+  return originPush.call(this, location).catch(() => {}) // ← 吞掉 NavigationDuplicated
+}
+VueRouter.prototype.replace = function (location, onResolve, onReject) {
+  if (onResolve || onReject) return originPush.call(this, location, onResolve, onReject)
+  return originPush.call(this, location).catch(() => {})
+}
+
+/* 路由表 */
 const router = new VueRouter({
   routes: [
-    { path: '/login', component: login },
+    { path: '/login', component: Login },
+
     {
       path: '/',
-      component: layout,
+      component: Layout,
       redirect: '/home',
       children: [
-        { path: '/home', component: home },
-        { path: '/category', component: category },
-        { path: '/cart', component: cart },
-        { path: '/user', component: user }
+        { path: '/home', component: Home },
+        { path: '/category', component: Category },
+        { path: '/cart', component: Cart },
+        { path: '/user', component: User }
       ]
     },
-    { path: '/search', component: search },
-    { path: '/list', component: list },
-    // 商品详情需要靠id来确认是哪个商品 所以动态路由传入id
-    { path: '/prodetail/:id', component: prodetail },
-    { path: '/pay', component: pay },
-    { path: '/order', component: order }
+
+    { path: '/search', component: Search },
+    { path: '/list', component: List },
+    // 商品要传id
+    { path: '/prodetail/:id', component: ProDetail },
+
+    /* 下面两个需要登录，因此加 meta.requiresAuth */
+    { path: '/pay', component: Pay, meta: { requiresAuth: true } },
+    { path: '/order', component: Order, meta: { requiresAuth: true } }
   ]
 })
 
-// beforeeach判断能否能到下一个页面 比如pay order
-// 定义一个需要登录才能访问的页面数组
-const authUrls = ['/pay', '/order']
-
-// to要去的页面
-// from从哪个页面去
-// next是跳转方法
-// next() 成功跳转到to的页面
-// next(路径) 跳转去括号内的路径
-// to.path就是这次要去的路由地址字符串，每次导航都会有，没什么默认跳转
+/* 全局前置守卫：统一鉴权 */
 router.beforeEach((to, from, next) => {
-// 有些网页需要跳转 有些页面不用  不包含在里面 让他跳转
-  if (!authUrls.includes(to.path)) {
-    next()
-    return
-  }
-  // 在跳转的页面中去判断你有没有登录 登陆过的都存在本地而且响应式了 可以用存储的token和userid 有就说明登录 没有就说明没登录去登录
-  // token由服务端颁发且登出就失效，能唯一证明当前登录态；userid只是账号标识，没法判定是否已登录；
-  // 这边封装到store方法里面是为了集中复用而且逻辑清晰(写到全局的store)
+  // 不需要登录 -> 直接通行
+  if (!to.meta.requiresAuth) return next()
+
+  // 需要登录：检查 token
   const token = store.getters.token
   if (token) {
-    next()
+    next() // 有 token，放行
   } else {
-    next('/login')
+    next('/login') // 无 token，跳登录
   }
 })
 
