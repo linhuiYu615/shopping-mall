@@ -2,5 +2,10 @@
 export default {
   namespaced: true,
   state: () => ({ list: [] }),
-  mutations: { SET (state, arr) { state.list = arr } }
+
+  mutations: {
+    SET (state, arr) {
+      state.list = arr
+    }
+  }
 }
